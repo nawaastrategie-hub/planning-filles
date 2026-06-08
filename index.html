@@ -132,7 +132,18 @@
         }
         .btn-print { background-color: #34495e; }
         .btn-clear { background-color: #c0392b; }
+        .btn-sync { background-color: #8e44ad; }
         #msg { color: #27ae60; font-weight: bold; min-width: 110px; }
+        #syncStatus {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            background: #f0f0f0;
+            color: #888;
+        }
+        #syncStatus.ok { background: #d5f4e6; color: #1e8449; }
+        #syncStatus.err { background: #fdebd0; color: #d35400; }
         #compteur {
             font-size: 12px;
             color: #2c3e50;
@@ -535,11 +546,13 @@
     <div class="controls">
         <div class="palette-titre">2. Tapote sur le tableau pour remplir</div>
         <button class="btn-action" onclick="sauvegarderPlanning()">💾 Enregistrer</button>
+        <button class="btn-action btn-sync" id="btnSync" onclick="synchroniserDepuisServeur()">🔄 Synchroniser</button>
         <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimer</button>
         <button class="btn-action btn-clear" onclick="effacerTout()">🗑️ Vider</button>
         <span id="compteur">Calme : <b>0%</b> (cible ~33%)</span>
         <span id="stats-validation">Fait : <b>0/0</b> (0%)</span>
         <span id="msg"></span>
+        <span id="syncStatus">⏳ Connexion...</span>
     </div>
 
     <div class="table-wrapper">
@@ -976,19 +989,40 @@
         }
 
         async function sauvegarderPlanning() {
-            localStorage.setItem(STORAGE_KEY(), tbody.innerHTML);
             const keyNom = PLANNING_NOM || 'default';
+            setMsg('⏳ Enregistrement...');
             try {
                 const db = await fetchDB();
                 if (!db.plannings) db.plannings = {};
                 if (!db.plannings[keyNom]) db.plannings[keyNom] = {};
                 db.plannings[keyNom][semaineCourante] = tbody.innerHTML;
                 const ok = await saveDB();
-                if (ok) setMsg("✓ Enregistré (partagé) !");
-                else setMsg("⚠ Sauvé en local seulement", '#e67e22');
+                if (ok) {
+                    // Données enregistrées sur le serveur — met à jour aussi le local
+                    localStorage.setItem(STORAGE_KEY(), tbody.innerHTML);
+                    setMsg('✓ Enregistré (partagé) !');
+                    setStatut('ok');
+                } else {
+                    localStorage.setItem(STORAGE_KEY(), tbody.innerHTML);
+                    setMsg('⚠ Sauvé en local seulement', '#e67e22');
+                    setStatut('err');
+                }
             } catch (e) {
-                setMsg("⚠ Hors-ligne : sauvé en local", '#e67e22');
+                localStorage.setItem(STORAGE_KEY(), tbody.innerHTML);
+                setMsg('⚠ Hors-ligne : sauvé en local', '#e67e22');
+                setStatut('err');
             }
+        }
+
+        // Force le rechargement depuis le serveur (ignore le cache local)
+        async function synchroniserDepuisServeur() {
+            const btn = document.getElementById('btnSync');
+            btn.disabled = true;
+            btn.textContent = '⏳ Synchro...';
+            dbCache = null; // vide le cache en mémoire
+            await chargerPlanning(true);
+            btn.disabled = false;
+            btn.textContent = '🔄 Synchroniser';
         }
 
         async function effacerTout() {
@@ -1007,7 +1041,7 @@
 
         tbody.addEventListener('input', majCompteur);
 
-        async function chargerPlanning() {
+        async function chargerPlanning(forceServeur = false) {
             const keyNom = PLANNING_NOM || 'default';
             try {
                 const db = await fetchDB();
@@ -1015,18 +1049,41 @@
                     const txt = db.plannings[keyNom][semaineCourante];
                     if (txt && txt.trim()) {
                         tbody.innerHTML = txt;
+                        // Met à jour le localStorage avec les données du serveur
+                        localStorage.setItem(STORAGE_KEY(), txt);
                         majCompteur();
+                        setStatut('ok');
+                        if (forceServeur) setMsg('✓ Données chargées depuis le serveur !');
                         return;
                     }
                 }
-            } catch (e) { /* hors-ligne */ }
-            const donnees = localStorage.getItem(STORAGE_KEY());
-            if (donnees) {
-                tbody.innerHTML = donnees;
-                majCompteur();
-            } else {
-                initialiserGrille();
+                // Serveur accessible mais pas de données pour cette semaine
+                if (!forceServeur) {
+                    const donnees = localStorage.getItem(STORAGE_KEY());
+                    if (donnees) { tbody.innerHTML = donnees; majCompteur(); }
+                    else initialiserGrille();
+                } else {
+                    initialiserGrille();
+                    setMsg('Aucun planning enregistré pour cette semaine', '#7f8c8d');
+                }
+                setStatut('ok');
+            } catch (e) {
+                setStatut('err');
+                if (!forceServeur) {
+                    const donnees = localStorage.getItem(STORAGE_KEY());
+                    if (donnees) { tbody.innerHTML = donnees; majCompteur(); }
+                    else initialiserGrille();
+                } else {
+                    setMsg('⚠ Impossible de contacter le serveur', '#c0392b');
+                }
             }
+        }
+
+        function setStatut(etat) {
+            const el = document.getElementById('syncStatus');
+            if (!el) return;
+            if (etat === 'ok') { el.textContent = '🟢 En ligne'; el.className = 'ok'; }
+            else { el.textContent = '🔴 Hors-ligne'; el.className = 'err'; }
         }
 
         // === Navigation semaine ===
