@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Zone safe = cercle central de rayon ~205, le reste est rogné par Android -->
+  <rect width="512" height="512" fill="#34495e"/>
+  <circle cx="256" cy="256" r="180" fill="#ecf0f1"/>
+  <rect x="166" y="180" width="180" height="32" rx="8" fill="#e74c3c"/>
+  <g fill="#bdc3c7">
+    <rect x="186" y="232" width="140" height="6" rx="3"/>
+    <rect x="186" y="260" width="140" height="6" rx="3"/>
+    <rect x="186" y="288" width="140" height="6" rx="3"/>
+    <rect x="186" y="316" width="140" height="6" rx="3"/>
+  </g>
+  <circle cx="206" cy="266" r="14" fill="#ffeaa7"/>
+  <circle cx="256" cy="294" r="14" fill="#a29bfe"/>
+  <circle cx="306" cy="266" r="14" fill="#55efc4"/>
+  <text x="256" y="370" font-size="40" text-anchor="middle">📅</text>
+</svg>

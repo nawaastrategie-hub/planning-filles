@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#34495e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Planning">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <title>Planning des Filles</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 12px;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin: 6px 0 14px;
+            font-size: clamp(20px, 4vw, 28px);
+        }
+
+        .palette-container {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+        }
+        .palette-titre {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #7f8c8d;
+            font-size: 12px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .palette-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-activite {
+            border: 2px solid transparent;
+            padding: 10px 14px;
+            border-radius: 22px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            min-height: 44px;
+            touch-action: manipulation;
+            transition: transform 0.1s, border 0.2s;
+            position: relative;
+        }
+        .btn-activite.has-sub::after {
+            content: "▾";
+            font-size: 10px;
+            margin-left: 4px;
+            opacity: 0.6;
+        }
+        .btn-activite.selectionne {
+            border: 2px solid #2c3e50;
+            transform: scale(1.08);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-activite.parent-actif {
+            border: 2px dashed #2c3e50;
+        }
+        .sous-palette {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            border: 1px dashed #bdc3c7;
+        }
+        .sous-palette.visible { display: flex; }
+        .sous-palette-titre {
+            width: 100%;
+            text-align: center;
+            font-size: 11px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .palette-edit {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #ccc;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .controls .palette-titre { margin: 0; }
+        .btn-action {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+        .btn-print { background-color: #34495e; }
+        .btn-clear { background-color: #c0392b; }
+        #msg { color: #27ae60; font-weight: bold; min-width: 110px; }
+        #compteur {
+            font-size: 12px;
+            color: #2c3e50;
+            background: #ecf0f1;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        #compteur b { color: #27ae60; }
+        #compteur.alerte b { color: #e67e22; }
+        #compteur.alerte b { color: #e67e22; }
+
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        table {
+            width: 100%;
+            min-width: 820px;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px 4px;
+            text-align: center;
+            font-size: 13px;
+        }
+        th {
+            background-color: #34495e;
+            color: white;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        th.weekend { background-color: #d35400; }
+        td.col-weekend { background-color: #fef5e7; }
+        td[contenteditable="true"] {
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-weight: bold;
+            min-height: 44px;
+            min-width: 80px;
+        }
+        td[contenteditable="true"]:active { opacity: 0.7; }
+        .horaire {
+            background-color: #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: default;
+            white-space: nowrap;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+        }
+        tr.separateur td { border-top: 3px solid #e74c3c; }
+        tr.demi-heure .horaire { color: #7f8c8d; font-weight: normal; font-size: 12px; }
+
+        /* Navigation semaine */
+        .semaine-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            background: white;
+            padding: 10px 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+        }
+        .semaine-bar .nav-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .semaine-bar .nav-btn:disabled { opacity: 0.4; }
+        .semaine-label {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 16px;
+            min-width: 220px;
+            text-align: center;
+        }
+        .semaine-label small { color: #7f8c8d; font-weight: normal; font-size: 12px; display: block; }
+        .semaine-bar select {
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #bdc3c7;
+            font-size: 14px;
+            min-height: 40px;
+            background: white;
+        }
+        .btn-aujourdhui {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            min-height: 40px;
+        }
+
+        /* Mode validation */
+        .mode-toggle {
+            display: inline-flex;
+            background: #ecf0f1;
+            border-radius: 22px;
+            padding: 3px;
+            gap: 0;
+        }
+        .mode-toggle button {
+            background: transparent;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 19px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #7f8c8d;
+            min-height: 40px;
+        }
+        .mode-toggle button.actif {
+            background: #2c3e50;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        body.mode-validation td[contenteditable="true"] {
+            cursor: pointer;
+        }
+        body.mode-validation td[contenteditable="true"]:not(:empty):hover {
+            outline: 2px dashed #27ae60;
+        }
+        td[data-done="1"] {
+            position: relative;
+        }
+        td[data-done="1"]::after {
+            content: "✓";
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 16px;
+            text-shadow: 0 0 3px white, 0 0 3px white;
+        }
+        td[data-done="1"] {
+            box-shadow: inset 0 0 0 3px #27ae60;
+        }
+        /* Stat de validation */
+        #stats-validation {
+            font-size: 12px;
+            color: #2c3e50;
+            background: #d5f4e6;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        #stats-validation b { color: #27ae60; }
+        #stats-validation.warn { background: #fdebd0; }
+        #stats-validation.warn b { color: #d35400; }
+
+        /* === Editeur de palette === */
+        #editorOverlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #editorOverlay.visible { display: block; }
+        #editorPanel {
+            max-width: 720px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        #editorPanel h2 {
+            margin: 0 0 12px;
+            color: #2c3e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .editor-cat {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #fafafa;
+        }
+        .editor-cat-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .editor-preview {
+            padding: 8px 12px;
+            border-radius: 18px;
+            font-weight: bold;
+            font-size: 13px;
+            flex: 1;
+            min-width: 140px;
+            text-align: center;
+        }
+        .editor-btn {
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+            cursor: pointer;
+            min-height: 36px;
+            min-width: 36px;
+        }
+        .editor-btn.danger { background: #fdebd0; border-color: #e67e22; color: #d35400; }
+        .editor-btn.primary { background: #d5f4e6; border-color: #27ae60; color: #1e8449; }
+        .editor-form {
+            background: white;
+            border: 2px dashed #3498db;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 6px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .editor-form label {
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
+            color: #34495e;
+            gap: 2px;
+        }
+        .editor-form input[type="text"] {
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .editor-form input[type="color"] {
+            width: 100%; height: 36px;
+            padding: 0; border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .editor-form .full { grid-column: 1 / -1; }
+        .editor-form .actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+        .editor-sub-list {
+            margin-left: 14px;
+            padding-left: 12px;
+            border-left: 2px solid #ecf0f1;
+            margin-top: 6px;
+        }
+        .editor-sub-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 0;
+            flex-wrap: wrap;
+        }
+        .editor-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #ddd;
+            flex-wrap: wrap;
+        }
+        .editor-footer button {
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            min-height: 44px;
+        }
+        #btnEditorOpen {
+            background: transparent;
+            border: 1px solid #bdc3c7;
+            color: #2c3e50;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            min-height: 36px;
+        }
+        @media (max-width: 640px) {
+            .editor-form { grid-template-columns: 1fr; }
+            .editor-preview { min-width: 100px; }
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 8px; }
+            .btn-activite { font-size: 13px; padding: 9px 11px; }
+            th, td { padding: 8px 3px; font-size: 12px; }
+            td[contenteditable="true"] { min-width: 70px; }
+            .controls { gap: 6px; }
+            .btn-action { padding: 10px 14px; font-size: 14px; }
+        }
+
+        @media print {
+            @page { size: A4 landscape; margin: 0.8cm; }
+            body { background-color: white; padding: 0; }
+            .palette-container, .controls, .btn-action { display: none !important; }
+            .table-wrapper { overflow: visible; box-shadow: none; }
+            table { min-width: 0; box-shadow: none; border: 2px solid #000; font-size: 10px; }
+            th, td {
+                border: 1px solid #000;
+                padding: 4px 2px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .horaire, th { position: static; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="titre">📅 Planning</h1>
+
+    <div class="semaine-bar">
+        <button class="nav-btn" id="navPrev" title="Semaine précédente">◀</button>
+        <div class="semaine-label" id="semaineLabel">Semaine —</div>
+        <button class="nav-btn" id="navNext" title="Semaine suivante">▶</button>
+        <button class="btn-aujourdhui" id="btnAujourdhui">Aujourd'hui</button>
+        <select id="selectHistorique" title="Dupliquer un planning passé">
+            <option value="">📋 Dupliquer depuis…</option>
+        </select>
+        <div class="mode-toggle">
+            <button id="modeEdit" class="actif">✏️ Éditer</button>
+            <button id="modeValid">✅ Valider</button>
+        </div>
+    </div>
+
+    <div class="palette-container">
+        <div class="palette-titre">1. Choisis une activité</div>
+        <div class="palette-grid" id="paletteGrid"></div>
+        <div class="sous-palette" id="sousPalette">
+            <div class="sous-palette-titre" id="sousPaletteTitre"></div>
+        </div>
+        <div class="palette-edit">
+            <button class="btn-activite" style="background-color: #fff; border: 1px solid #ccc;" onclick="choisirOutil(this, '', '#ffffff')">🧹 Effacer</button>
+            <button class="btn-activite" style="background-color: #fff; border: 1px dashed #333;" onclick="activerTexteLibre(this)">✍️ Texte libre</button>
+            <button id="btnEditorOpen" onclick="ouvrirEditeur()">⚙️ Gérer les activités</button>
+        </div>
+    </div>
+
+    <!-- ===== Editeur de palette ===== -->
+    <div id="editorOverlay" onclick="if(event.target.id==='editorOverlay') fermerEditeur()">
+        <div id="editorPanel">
+            <h2>⚙️ Gérer les activités <button class="editor-btn" onclick="fermerEditeur()">✖</button></h2>
+            <p style="color:#7f8c8d;font-size:13px;margin:0 0 12px;">
+                Ajoute, modifie ou supprime des activités. Tes changements seront partagés entre tous les appareils.
+            </p>
+            <div id="editorList"></div>
+            <div style="text-align:center;margin-top:10px;">
+                <button class="editor-btn primary" onclick="ajouterCategorie()">➕ Ajouter une catégorie</button>
+                <button class="editor-btn" onclick="resetPalette()" title="Revenir à la palette d'origine">↩ Réinitialiser</button>
+            </div>
+            <div class="editor-footer">
+                <button class="editor-btn danger" onclick="fermerEditeur(false)">Annuler</button>
+                <button class="editor-btn primary" onclick="sauverPalette()">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="palette-titre">2. Tapote sur le tableau pour remplir</div>
+        <button class="btn-action" onclick="sauvegarderPlanning()">💾 Enregistrer</button>
+        <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimer</button>
+        <button class="btn-action btn-clear" onclick="effacerTout()">🗑️ Vider</button>
+        <span id="compteur">Calme : <b>0%</b> (cible ~33%)</span>
+        <span id="stats-validation">Fait : <b>0/0</b> (0%)</span>
+        <span id="msg"></span>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Horaires</th>
+                    <th>Dimanche</th>
+                    <th>Lundi</th>
+                    <th>Mardi</th>
+                    <th>Mercredi</th>
+                    <th>Jeudi</th>
+                    <th class="weekend">Vendredi</th>
+                    <th class="weekend">Samedi</th>
+                </tr>
+            </thead>
+            <tbody id="planningBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const tbody = document.getElementById('planningBody');
+
+        // === Identifie le planning courant via ?p=NOM ===
+        const params = new URLSearchParams(window.location.search);
+        const PLANNING_NOM = (params.get('p') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+
+        // Met à jour le titre + l'onglet
+        const nomAffiche = PLANNING_NOM ? PLANNING_NOM.charAt(0).toUpperCase() + PLANNING_NOM.slice(1) : 'des Filles';
+        document.getElementById('titre').textContent = '📅 Planning ' + (PLANNING_NOM ? '— ' + nomAffiche : 'des Filles');
+        document.title = 'Planning ' + nomAffiche;
+
+        // === CONFIGURATION BASE DE DONNEES ONLINE ===
+        const BIN_ID = 'ffcafdf';
+        const SECURITY_KEY = 'sec-planning-filles-9a8b7c';
+        const DB_URL = 'https://extendsclass.com/api/json-storage/bin/' + BIN_ID;
+
+        let dbCache = null;
+
+        async function fetchDB() {
+            try {
+                const r = await fetch(DB_URL, { cache: 'no-store' });
+                if (r.ok) {
+                    dbCache = await r.json();
+                } else {
+                    console.error("Impossible de récupérer la base de données. Statut:", r.status);
+                    dbCache = dbCache || { plannings: {}, palette: PALETTE_DEFAUT };
+                }
+            } catch (e) {
+                console.error("Erreur de connexion à la base de données:", e);
+                dbCache = dbCache || { plannings: {}, palette: PALETTE_DEFAUT };
+            }
+            return dbCache;
+        }
+
+        async function saveDB() {
+            if (!dbCache) return false;
+            try {
+                const r = await fetch(DB_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Security-key': SECURITY_KEY
+                    },
+                    body: JSON.stringify(dbCache)
+                });
+                return r.ok;
+            } catch (e) {
+                console.error("Erreur d'écriture dans la base de données:", e);
+                return false;
+            }
+        }
+
+        // === Calcul "semaine algérienne" (dimanche = 1er jour) ===
+        // Numérotation : la semaine algérienne contenant Mon X = ISO week de Mon X.
+        // Donc semaine 24 = Dim 7 juin → Sam 13 juin (2026).
+        function isoWeekOf(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+            return { year: d.getUTCFullYear(), week: weekNum };
+        }
+        // Semaine algérienne d'une date = ISO week de la date décalée de +1 jour
+        // (ainsi un dimanche tombe dans la même semaine que le lundi suivant)
+        function algerianWeekOf(date) {
+            const d = new Date(date);
+            d.setDate(d.getDate() + 1);
+            return isoWeekOf(d);
+        }
+        function weekKey(year, week) {
+            return year + '-W' + String(week).padStart(2, '0');
+        }
+        function parseWeekKey(k) {
+            const m = /^(\d{4})-W(\d{1,2})$/.exec(k);
+            return m ? { year: +m[1], week: +m[2] } : null;
+        }
+        // Dimanche (1er jour) de la semaine algérienne donnée
+        function sundayOfWeek(year, week) {
+            // On part du lundi ISO et on recule d'1 jour
+            const jan4 = new Date(Date.UTC(year, 0, 4));
+            const jan4Day = jan4.getUTCDay() || 7;
+            const monday = new Date(jan4);
+            monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1) + (week - 1) * 7);
+            monday.setUTCDate(monday.getUTCDate() - 1); // → dimanche
+            return monday;
+        }
+        function fmtJour(d) {
+            return String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0');
+        }
+
+        // Semaine courante affichée (peut être différente de la semaine "aujourd'hui")
+        const semaineAuj = algerianWeekOf(new Date());
+        let semaineCourante = semaineAuj.year + '-W' + String(semaineAuj.week).padStart(2, '0');
+        // Si ?w= dans l'URL, on charge cette semaine
+        const wParam = params.get('w');
+        if (wParam && /^\d{4}-W\d{1,2}$/.test(wParam)) {
+            const p = parseWeekKey(wParam);
+            semaineCourante = weekKey(p.year, p.week);
+        }
+
+        function STORAGE_KEY() {
+            return 'planning_v5_' + (PLANNING_NOM || 'default') + '_' + semaineCourante;
+        }
+
+        let outilTexte = "";
+        let outilCouleur = "";
+        let modeTexteLibre = false;
+
+        // Colonnes : Dim, Lun, Mar, Mer, Jeu, Ven (WE), Sam (WE)
+        const joursWeekend = [5, 6]; // index 0-based des jours WE
+
+        const PALETTE_DEFAUT = [
+            { label: '🧠 Révisions', bg: '#ffeaa7', fg: '#d35400', sub: [
+                { label: '🇩🇿 Arabe', bg: '#ffe082', fg: '#7d4f00' },
+                { label: '🇫🇷 Français', bg: '#ffe9a8', fg: '#7d4f00' },
+                { label: '🇬🇧 Anglais', bg: '#ffd166', fg: '#7d4f00' },
+                { label: '🔢 Maths', bg: '#ffc04d', fg: '#5c2800' },
+                { label: '🔬 Sciences', bg: '#ffb347', fg: '#5c2800' },
+                { label: '🕌 Éducation islamique', bg: '#f2c879', fg: '#3e2300' },
+                { label: '🌍 Histoire-Géo', bg: '#e6b35a', fg: '#3e2300' },
+                { label: 'ⵣ Tamazight', bg: '#d9a647', fg: '#fff' },
+            ]},
+            { label: '📚 Lecture', bg: '#81ecec', fg: '#008080', sub: [
+                { label: '📖 Coran', bg: '#c8d6e5', fg: '#222f3e' },
+                { label: '📕 BD', bg: '#a3d9ff', fg: '#005082' },
+                { label: '📗 Roman', bg: '#7ed6a1', fg: '#0a5d2e' },
+                { label: '📘 Documentaire', bg: '#b4a3ff', fg: '#3a1f7a' },
+            ]},
+            { label: '🎨 Créativité', bg: '#ffcccc', fg: '#c0392b', sub: [
+                { label: '✏️ Dessin', bg: '#ffd6cc', fg: '#c0392b' },
+                { label: '🖌️ Peinture', bg: '#ffb3a7', fg: '#a93226' },
+                { label: '✂️ Bricolage', bg: '#f5b7b1', fg: '#922b21' },
+                { label: '🪡 Perles/Couture', bg: '#e6b0aa', fg: '#7b241c' },
+            ]},
+            { label: '🧑‍🍳 Cuisine', bg: '#fab1a0', fg: '#d35400', sub: [
+                { label: '🧁 Pâtisserie', bg: '#fdc6b3', fg: '#a04000' },
+                { label: '🥗 Salade', bg: '#f8b88b', fg: '#7e3700' },
+                { label: '🍳 Aide repas', bg: '#f5a76e', fg: '#5c2800' },
+            ]},
+            { label: '🌲 Balade', bg: '#55efc4', fg: '#006266' },
+            { label: '🚗 Sorties', bg: '#48dbb4', fg: '#004a3d', sub: [
+                { label: '🦁 Zoo', bg: '#7be0c2', fg: '#004a3d' },
+                { label: '🌊 Mer', bg: '#5fcfe0', fg: '#003d4a' },
+                { label: '⛰️ Montagne', bg: '#8ec7a8', fg: '#1a4d33' },
+                { label: '🌳 Parc', bg: '#a6dec1', fg: '#1a4d33' },
+                { label: '🎡 Famille', bg: '#7fdab9', fg: '#003d2f' },
+            ]},
+            { label: '⚽ Sport', bg: '#fdcb6e', fg: '#d63031', sub: [
+                { label: '🚴 Vélo', bg: '#ffd97a', fg: '#a93226' },
+                { label: '🤸 Gym', bg: '#fbc875', fg: '#8e4400' },
+                { label: '🧘‍♀️ Yoga', bg: '#f9d56e', fg: '#7d6608' },
+                { label: '🥋 Aïkido', bg: '#f5b65a', fg: '#7b3f00' },
+                { label: '🪢 Corde à sauter', bg: '#f0a64e', fg: '#5c2800' },
+            ]},
+            { label: '🎲 Jeux', bg: '#a29bfe', fg: '#4b2354', sub: [
+                { label: '🎲 Société', bg: '#b5aefb', fg: '#3a1d56' },
+                { label: '🧱 Construction', bg: '#c0b6ff', fg: '#3a1d56' },
+                { label: '🪆 Poupées', bg: '#d1c4ff', fg: '#3a1d56' },
+                { label: '🌳 Dehors', bg: '#8cd9b3', fg: '#0a5d2e' },
+            ]},
+            { label: '🏠 Tâche maison', bg: '#74b9ff', fg: '#fff', sub: [
+                { label: '👕 Linge à pendre', bg: '#a3cffa', fg: '#0a3d6e' },
+                { label: '🍽️ Lave-vaisselle', bg: '#8cc0f5', fg: '#0a3d6e' },
+                { label: '🧺 Plier le linge', bg: '#7ab5ee', fg: '#0a3d6e' },
+                { label: '🧹 Ranger chambre', bg: '#6aaae8', fg: '#fff' },
+                { label: '🍴 Mettre la table', bg: '#5a9fe2', fg: '#fff' },
+                { label: '🧽 Aider ménage', bg: '#4a93dc', fg: '#fff' },
+            ]},
+            { label: '📺 Écrans', bg: '#dfe6e9', fg: '#2d3436' },
+            { label: '🧘 Temps Calme', bg: '#f8a5c2', fg: '#596275', calme: true },
+            { label: '🧩 Quartier Libre', bg: '#cf6a87', fg: '#fff', calme: true },
+            { label: '🛁 Routine', bg: '#b2bec3', fg: '#fff' },
+            { label: '🍽️ Repas', bg: '#ffeaa7', fg: '#2d3436' },
+        ];
+
+        // Palette active (modifiable par l'éditeur)
+        let palette = JSON.parse(JSON.stringify(PALETTE_DEFAUT));
+        // Liste des labels "calme" — recalculée à chaque rendu
+        let labelsCalmes = palette.filter(p => p.calme).map(p => p.label);
+
+        async function chargerPalette() {
+            const db = await fetchDB();
+            if (db && Array.isArray(db.palette) && db.palette.length) {
+                palette = db.palette;
+            } else {
+                const local = localStorage.getItem('palette_v1');
+                if (local) {
+                    try {
+                        palette = JSON.parse(local);
+                    } catch (e) { palette = JSON.parse(JSON.stringify(PALETTE_DEFAUT)); }
+                } else {
+                    palette = JSON.parse(JSON.stringify(PALETTE_DEFAUT));
+                }
+            }
+            labelsCalmes = palette.filter(p => p.calme).map(p => p.label);
+        }
+
+        function genererHoraires() {
+            const list = [];
+            for (let m = 8 * 60 + 30; m < 18 * 60; m += 30) {
+                const h1 = Math.floor(m / 60), mn1 = m % 60;
+                const h2 = Math.floor((m + 30) / 60), mn2 = (m + 30) % 60;
+                const fmt = (h, x) => String(h).padStart(2, '0') + 'h' + String(x).padStart(2, '0');
+                list.push(fmt(h1, mn1) + ' - ' + fmt(h2, mn2));
+            }
+            return list;
+        }
+        const horaires = genererHoraires();
+
+        function construirePalette() {
+            const grid = document.getElementById('paletteGrid');
+            grid.innerHTML = '';
+            palette.forEach((item, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-activite' + (item.sub ? ' has-sub' : '');
+                btn.style.backgroundColor = item.bg;
+                btn.style.color = item.fg;
+                btn.textContent = item.label;
+                btn.dataset.idx = idx;
+                btn.onclick = () => clicCategorie(btn, item);
+                grid.appendChild(btn);
+            });
+        }
+
+        function clicCategorie(btn, item) {
+            if (item.sub) {
+                afficherSousPalette(btn, item);
+            } else {
+                masquerSousPalette();
+                choisirOutil(btn, item.label, item.bg);
+            }
+        }
+
+        function afficherSousPalette(parentBtn, item) {
+            document.querySelectorAll('.btn-activite').forEach(b => {
+                b.classList.remove('selectionne');
+                b.classList.remove('parent-actif');
+            });
+            parentBtn.classList.add('parent-actif');
+
+            const sp = document.getElementById('sousPalette');
+            const titre = document.getElementById('sousPaletteTitre');
+            sp.innerHTML = '';
+            sp.appendChild(titre);
+            titre.textContent = '→ ' + item.label + ' : choisis le détail';
+
+            item.sub.forEach(sous => {
+                const b = document.createElement('button');
+                b.className = 'btn-activite';
+                b.style.backgroundColor = sous.bg;
+                b.style.color = sous.fg;
+                b.textContent = sous.label;
+                b.onclick = () => choisirOutil(b, sous.label, sous.bg);
+                sp.appendChild(b);
+            });
+            sp.classList.add('visible');
+        }
+
+        function masquerSousPalette() {
+            document.getElementById('sousPalette').classList.remove('visible');
+            document.querySelectorAll('.btn-activite.parent-actif').forEach(b => b.classList.remove('parent-actif'));
+        }
+
+        function choisirOutil(bouton, texte, couleur) {
+            outilTexte = texte;
+            outilCouleur = couleur;
+            modeTexteLibre = false;
+            mettreAJourBoutons(bouton);
+        }
+
+        function activerTexteLibre(bouton) {
+            modeTexteLibre = true;
+            masquerSousPalette();
+            mettreAJourBoutons(bouton);
+        }
+
+        function mettreAJourBoutons(boutonActif) {
+            document.querySelectorAll('.btn-activite').forEach(btn => btn.classList.remove('selectionne'));
+            boutonActif.classList.add('selectionne');
+        }
+
+        let modeValidation = false;
+        function appliquerActivite(cellule) {
+            if (modeValidation) {
+                if (!cellule.innerText.trim()) return;
+                if (cellule.dataset.done === '1') {
+                    delete cellule.dataset.done;
+                } else {
+                    cellule.dataset.done = '1';
+                }
+                majCompteur();
+                return;
+            }
+            if (modeTexteLibre) return;
+            cellule.innerText = outilTexte;
+            cellule.style.backgroundColor = outilCouleur;
+            if (!outilTexte) delete cellule.dataset.done;
+            majCompteur();
+        }
+
+        function initialiserGrille() {
+            let html = '';
+            horaires.forEach(heure => {
+                const isDemi = !heure.startsWith('08h30') && !heure.startsWith('09h30')
+                    && !heure.startsWith('10h30') && !heure.startsWith('11h30')
+                    && !heure.startsWith('12h00') && !heure.startsWith('13h30')
+                    && !heure.startsWith('14h00') && !heure.startsWith('15h30')
+                    && !heure.startsWith('16h30');
+                const sep = heure.startsWith('12h00') || heure.startsWith('13h30') || heure.startsWith('16h30');
+                const classes = (sep ? 'separateur ' : '') + (isDemi ? 'demi-heure' : '');
+                let cells = '';
+                for (let j = 0; j < 7; j++) {
+                    const we = joursWeekend.includes(j) ? ' col-weekend' : '';
+                    cells += `<td contenteditable="true" class="${we.trim()}" onclick="appliquerActivite(this)"></td>`;
+                }
+                html += `<tr class="${classes}"><td class="horaire">${heure}</td>${cells}</tr>`;
+            });
+            tbody.innerHTML = html;
+            majCompteur();
+        }
+
+        function majCompteur() {
+            const cells = tbody.querySelectorAll('td[contenteditable="true"]');
+            let totalRemplies = 0, calmes = 0, faits = 0;
+            cells.forEach(c => {
+                const txt = c.innerText.trim();
+                if (txt) {
+                    totalRemplies++;
+                    if (labelsCalmes.includes(txt)) calmes++;
+                    if (c.dataset.done === '1') faits++;
+                }
+            });
+            const pct = totalRemplies ? Math.round(calmes / totalRemplies * 100) : 0;
+            const el = document.getElementById('compteur');
+            el.innerHTML = `Calme : <b>${pct}%</b> (cible ~33%) — ${calmes}/${totalRemplies} cases`;
+            el.classList.toggle('alerte', totalRemplies > 10 && pct < 25);
+
+            // Stats validation
+            const pctFait = totalRemplies ? Math.round(faits / totalRemplies * 100) : 0;
+            const ev = document.getElementById('stats-validation');
+            ev.innerHTML = `Fait : <b>${faits}/${totalRemplies}</b> (${pctFait}%)`;
+            ev.classList.toggle('warn', totalRemplies > 0 && pctFait < 100);
+        }
+
+        function setMsg(txt, color) {
+            const msg = document.getElementById('msg');
+            msg.style.color = color || '#27ae60';
+            msg.innerText = txt;
+            setTimeout(() => { msg.innerText = ""; }, 2500);
+        }
+
+        async function sauvegarderPlanning() {
+            localStorage.setItem(STORAGE_KEY(), tbody.innerHTML);
+            const keyNom = PLANNING_NOM || 'default';
+            try {
+                const db = await fetchDB();
+                if (!db.plannings) db.plannings = {};
+                if (!db.plannings[keyNom]) db.plannings[keyNom] = {};
+                db.plannings[keyNom][semaineCourante] = tbody.innerHTML;
+                const ok = await saveDB();
+                if (ok) setMsg("✓ Enregistré (partagé) !");
+                else setMsg("⚠ Sauvé en local seulement", '#e67e22');
+            } catch (e) {
+                setMsg("⚠ Hors-ligne : sauvé en local", '#e67e22');
+            }
+        }
+
+        async function effacerTout() {
+            if (!confirm('Vider tout le planning ?')) return;
+            localStorage.removeItem(STORAGE_KEY());
+            initialiserGrille();
+            const keyNom = PLANNING_NOM || 'default';
+            try {
+                const db = await fetchDB();
+                if (!db.plannings) db.plannings = {};
+                if (!db.plannings[keyNom]) db.plannings[keyNom] = {};
+                db.plannings[keyNom][semaineCourante] = tbody.innerHTML;
+                await saveDB();
+            } catch (e) { /* ignore */ }
+        }
+
+        tbody.addEventListener('input', majCompteur);
+
+        async function chargerPlanning() {
+            const keyNom = PLANNING_NOM || 'default';
+            try {
+                const db = await fetchDB();
+                if (db && db.plannings && db.plannings[keyNom] && db.plannings[keyNom][semaineCourante]) {
+                    const txt = db.plannings[keyNom][semaineCourante];
+                    if (txt && txt.trim()) {
+                        tbody.innerHTML = txt;
+                        majCompteur();
+                        return;
+                    }
+                }
+            } catch (e) { /* hors-ligne */ }
+            const donnees = localStorage.getItem(STORAGE_KEY());
+            if (donnees) {
+                tbody.innerHTML = donnees;
+                majCompteur();
+            } else {
+                initialiserGrille();
+            }
+        }
+
+        // === Navigation semaine ===
+        function majSemaineUI() {
+            const p = parseWeekKey(semaineCourante);
+            const dim = sundayOfWeek(p.year, p.week);
+            const sam = new Date(dim);
+            sam.setUTCDate(dim.getUTCDate() + 6);
+            const auj = weekKey(semaineAuj.year, semaineAuj.week);
+            const tag = (semaineCourante === auj) ? ' (en cours)'
+                      : (semaineCourante < auj ? ' (passée)' : ' (à venir)');
+            document.getElementById('semaineLabel').innerHTML =
+                `Semaine ${p.week}<small>du Dim ${fmtJour(dim)} au Sam ${fmtJour(sam)} ${p.year}${tag}</small>`;
+        }
+        function decalerSemaine(delta) {
+            const p = parseWeekKey(semaineCourante);
+            const dim = sundayOfWeek(p.year, p.week);
+            dim.setUTCDate(dim.getUTCDate() + delta * 7);
+            const localDate = new Date(dim.getUTCFullYear(), dim.getUTCMonth(), dim.getUTCDate());
+            const ng = algerianWeekOf(localDate);
+            semaineCourante = weekKey(ng.year, ng.week);
+            majSemaineUI();
+            chargerPlanning();
+            chargerHistorique();
+            const newParams = new URLSearchParams(window.location.search);
+            newParams.set('w', semaineCourante);
+            history.replaceState({}, '', '?' + newParams.toString());
+        }
+
+        document.getElementById('navPrev').onclick = () => decalerSemaine(-1);
+        document.getElementById('navNext').onclick = () => decalerSemaine(1);
+        document.getElementById('btnAujourdhui').onclick = () => {
+            semaineCourante = weekKey(semaineAuj.year, semaineAuj.week);
+            majSemaineUI();
+            chargerPlanning();
+            chargerHistorique();
+            const newParams = new URLSearchParams(window.location.search);
+            newParams.delete('w');
+            const qs = newParams.toString();
+            history.replaceState({}, '', qs ? '?' + qs : window.location.pathname);
+        };
+
+        // === Historique : liste des semaines + duplication ===
+        async function chargerHistorique() {
+            const sel = document.getElementById('selectHistorique');
+            sel.innerHTML = '<option value="">📋 Dupliquer depuis…</option>';
+            const keyNom = PLANNING_NOM || 'default';
+            try {
+                const db = await fetchDB();
+                if (db && db.plannings && db.plannings[keyNom]) {
+                    const semaines = Object.keys(db.plannings[keyNom]);
+                    semaines.sort().reverse();
+                    semaines.filter(s => s !== semaineCourante).forEach(s => {
+                        const p = parseWeekKey(s);
+                        if (!p) return;
+                        const dim = sundayOfWeek(p.year, p.week);
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.textContent = `📋 Sem ${p.week} (Dim ${fmtJour(dim)}) ${p.year}`;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch (e) { /* silencieux */ }
+        }
+        document.getElementById('selectHistorique').onchange = async (e) => {
+            const src = e.target.value;
+            if (!src) return;
+            e.target.value = '';
+            if (!confirm(`Copier le planning de ${src} sur la semaine ${semaineCourante} ?\nLe contenu actuel sera remplacé.`)) return;
+            try {
+                const keyNom = PLANNING_NOM || 'default';
+                const db = await fetchDB();
+                if (db && db.plannings && db.plannings[keyNom] && db.plannings[keyNom][src]) {
+                    const txt = db.plannings[keyNom][src];
+                    if (!txt.trim()) { setMsg("⚠ Source vide", '#e67e22'); return; }
+                    tbody.innerHTML = txt;
+                    tbody.querySelectorAll('td[data-done="1"]').forEach(td => delete td.dataset.done);
+                    majCompteur();
+                    setMsg("✓ Dupliqué — pense à enregistrer");
+                } else {
+                    setMsg("⚠ Lecture impossible", '#e67e22');
+                }
+            } catch (err) {
+                setMsg("⚠ Erreur duplication", '#e67e22');
+            }
+        };
+
+        // === Mode Édition / Validation ===
+        const btnEdit = document.getElementById('modeEdit');
+        const btnValid = document.getElementById('modeValid');
+        btnEdit.onclick = () => {
+            modeValidation = false;
+            document.body.classList.remove('mode-validation');
+            btnEdit.classList.add('actif');
+            btnValid.classList.remove('actif');
+        };
+        btnValid.onclick = () => {
+            modeValidation = true;
+            document.body.classList.add('mode-validation');
+            btnValid.classList.add('actif');
+            btnEdit.classList.remove('actif');
+        };
+
+        // ===== Editeur de palette =====
+        let editorDraft = null;
+        let editingPath = null;
+
+        function ouvrirEditeur() {
+            editorDraft = JSON.parse(JSON.stringify(palette));
+            editingPath = null;
+            renderEditor();
+            document.getElementById('editorOverlay').classList.add('visible');
+        }
+
+        function fermerEditeur(askSave) {
+            if (askSave === undefined) askSave = false;
+            document.getElementById('editorOverlay').classList.remove('visible');
+            editorDraft = null;
+            editingPath = null;
+        }
+
+        function getAtPath(path) {
+            let node = { sub: editorDraft };
+            for (let i = 0; i < path.length; i++) node = node.sub[path[i]];
+            return node;
+        }
+
+        function pathEgale(a, b) {
+            if (!a || !b || a.length !== b.length) return false;
+            return a.every((v, i) => v === b[i]);
+        }
+
+        function renderEditor() {
+            const list = document.getElementById('editorList');
+            list.innerHTML = '';
+            editorDraft.forEach((cat, i) => list.appendChild(renderCat(cat, [i])));
+        }
+
+        function renderCat(cat, path) {
+            const wrap = document.createElement('div');
+            wrap.className = 'editor-cat';
+
+            const row = document.createElement('div');
+            row.className = 'editor-cat-row';
+
+            const prev = document.createElement('div');
+            prev.className = 'editor-preview';
+            prev.style.backgroundColor = cat.bg || '#eee';
+            prev.style.color = cat.fg || '#000';
+            prev.textContent = cat.label || '(sans nom)';
+            row.appendChild(prev);
+
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'editor-btn';
+            btnEdit.textContent = '✏️';
+            btnEdit.title = 'Modifier';
+            btnEdit.onclick = () => {
+                editingPath = pathEgale(editingPath, path) ? null : path;
+                renderEditor();
+            };
+            row.appendChild(btnEdit);
+
+            const btnDel = document.createElement('button');
+            btnDel.className = 'editor-btn danger';
+            btnDel.textContent = '🗑️';
+            btnDel.title = 'Supprimer';
+            btnDel.onclick = () => {
+                if (!confirm(`Supprimer "${cat.label}" ?`)) return;
+                const idx = path[path.length - 1];
+                let parent = { sub: editorDraft };
+                for (let i = 0; i < path.length - 1; i++) parent = parent.sub[path[i]];
+                parent.sub.splice(idx, 1);
+                editingPath = null;
+                renderEditor();
+            };
+            row.appendChild(btnDel);
+
+            if (path.length === 1) {
+                const btnAddSub = document.createElement('button');
+                btnAddSub.className = 'editor-btn primary';
+                btnAddSub.textContent = '➕ sous';
+                btnAddSub.title = 'Ajouter une sous-catégorie';
+                btnAddSub.onclick = () => {
+                    if (!cat.sub) cat.sub = [];
+                    cat.sub.push({ label: '✨ Nouveau', bg: cat.bg, fg: cat.fg });
+                    editingPath = [path[0], cat.sub.length - 1];
+                    renderEditor();
+                };
+                row.appendChild(btnAddSub);
+            }
+
+            wrap.appendChild(row);
+
+            if (pathEgale(editingPath, path)) {
+                wrap.appendChild(renderForm(cat, path));
+            }
+
+            if (path.length === 1 && cat.sub && cat.sub.length) {
+                const subList = document.createElement('div');
+                subList.className = 'editor-sub-list';
+                cat.sub.forEach((s, j) => {
+                    const subWrap = document.createElement('div');
+                    const subRow = document.createElement('div');
+                    subRow.className = 'editor-sub-row';
+
+                    const sprev = document.createElement('div');
+                    sprev.className = 'editor-preview';
+                    sprev.style.backgroundColor = s.bg || '#eee';
+                    sprev.style.color = s.fg || '#000';
+                    sprev.textContent = s.label || '(sans nom)';
+                    subRow.appendChild(sprev);
+
+                    const sbEdit = document.createElement('button');
+                    sbEdit.className = 'editor-btn';
+                    sbEdit.textContent = '✏️';
+                    sbEdit.onclick = () => {
+                        const p = [path[0], j];
+                        editingPath = pathEgale(editingPath, p) ? null : p;
+                        renderEditor();
+                    };
+                    subRow.appendChild(sbEdit);
+
+                    const sbDel = document.createElement('button');
+                    sbDel.className = 'editor-btn danger';
+                    sbDel.textContent = '🗑️';
+                    sbDel.onclick = () => {
+                        if (!confirm(`Supprimer "${s.label}" ?`)) return;
+                        cat.sub.splice(j, 1);
+                        if (cat.sub.length === 0) delete cat.sub;
+                        editingPath = null;
+                        renderEditor();
+                    };
+                    subRow.appendChild(sbDel);
+
+                    subWrap.appendChild(subRow);
+                    if (pathEgale(editingPath, [path[0], j])) {
+                        subWrap.appendChild(renderForm(s, [path[0], j]));
+                    }
+                    subList.appendChild(subWrap);
+                });
+                wrap.appendChild(subList);
+            }
+            return wrap;
+        }
+
+        function renderForm(item, path) {
+            const form = document.createElement('div');
+            form.className = 'editor-form';
+            const isTop = path.length === 1;
+
+            form.innerHTML = `
+                <label class="full">Nom (avec emoji si tu veux)
+                    <input type="text" data-k="label" value="${(item.label || '').replace(/"/g,'&quot;')}">
+                </label>
+                <label>Couleur de fond
+                    <input type="color" data-k="bg" value="${item.bg || '#cccccc'}">
+                </label>
+                <label>Couleur du texte
+                    <input type="color" data-k="fg" value="${item.fg || '#000000'}">
+                </label>
+                ${isTop ? `
+                <label class="full">
+                    <span style="display:flex;gap:8px;align-items:center;">
+                        <input type="checkbox" data-k="calme" ${item.calme ? 'checked' : ''}>
+                        Compter comme "Temps calme / Quartier libre" (cible ~33%)
+                    </span>
+                </label>` : ''}
+                <div class="actions">
+                    <button class="editor-btn" data-act="cancel">Annuler</button>
+                    <button class="editor-btn primary" data-act="ok">✓ OK</button>
+                </div>
+            `;
+
+            form.querySelector('[data-act="ok"]').onclick = () => {
+                const inputs = form.querySelectorAll('[data-k]');
+                inputs.forEach(inp => {
+                    const k = inp.dataset.k;
+                    if (inp.type === 'checkbox') item[k] = inp.checked || undefined;
+                    else item[k] = inp.value;
+                });
+                if (item.calme === false) delete item.calme;
+                editingPath = null;
+                renderEditor();
+            };
+            form.querySelector('[data-act="cancel"]').onclick = () => {
+                editingPath = null;
+                renderEditor();
+            };
+            return form;
+        }
+
+        function ajouterCategorie() {
+            editorDraft.push({ label: '✨ Nouvelle activité', bg: '#dddddd', fg: '#000000' });
+            editingPath = [editorDraft.length - 1];
+            renderEditor();
+        }
+
+        function resetPalette() {
+            if (!confirm('Revenir à la palette d\'origine ? Tes modifications seront perdues (jusqu\'à enregistrement).')) return;
+            editorDraft = JSON.parse(JSON.stringify(PALETTE_DEFAUT));
+            editingPath = null;
+            renderEditor();
+        }
+
+        async function sauverPalette() {
+            if (!Array.isArray(editorDraft) || editorDraft.length === 0) {
+                alert('La palette ne peut pas être vide.');
+                return;
+            }
+            palette = editorDraft;
+            labelsCalmes = palette.filter(p => p.calme).map(p => p.label);
+            localStorage.setItem('palette_v1', JSON.stringify(palette));
+            try {
+                const db = await fetchDB();
+                db.palette = palette;
+                const ok = await saveDB();
+                if (ok) setMsg("✓ Palette enregistrée (partagée)");
+                else setMsg("⚠ Sauvée en local seulement", '#e67e22');
+            } catch (e) {
+                setMsg("⚠ Hors-ligne : palette en local", '#e67e22');
+            }
+            construirePalette();
+            majCompteur();
+            fermerEditeur();
+        }
+
+        window.onload = async function() {
+            await chargerPalette();
+            if (palette === PALETTE_DEFAUT || !palette.length) {
+                const local = localStorage.getItem('palette_v1');
+                if (local) {
+                    try {
+                        palette = JSON.parse(local);
+                        labelsCalmes = palette.filter(p => p.calme).map(p => p.label);
+                    } catch (e) { /* ignore */ }
+                }
+            }
+            construirePalette();
+            majSemaineUI();
+            await chargerPlanning();
+            await chargerHistorique();
+        }
+    </script>
+</body>
+</html>
