@@ -142,7 +142,6 @@
         }
         #compteur b { color: #27ae60; }
         #compteur.alerte b { color: #e67e22; }
-        #compteur.alerte b { color: #e67e22; }
 
         .table-wrapper {
             overflow-x: auto;
@@ -473,6 +472,18 @@
 </head>
 <body>
 
+    <!-- LOCK SCREEN OVERLAY -->
+    <div id="lockScreen" style="position:fixed; inset:0; background:rgba(44, 62, 80, 0.95); backdrop-filter:blur(8px); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <div style="background:white; color:#333; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.2); width:90%; max-width:400px; text-align:center;">
+            <span style="font-size:50px;">🔑</span>
+            <h2 style="margin:15px 0 10px; color:#2c3e50;">Planning des Filles</h2>
+            <p style="color:#7f8c8d; font-size:14px; margin-bottom:20px;">Veuillez entrer le mot de passe pour accéder au planning.</p>
+            <input type="password" id="lockPassword" placeholder="Mot de passe" style="width:100%; padding:12px; border:1.5px solid #bdc3c7; border-radius:8px; font-size:16px; margin-bottom:15px; text-align:center; outline:none; transition:border-color 0.2s;">
+            <button onclick="validerCode()" style="width:100%; padding:12px; background:#27ae60; color:white; border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer; transition:background 0.2s;">Accéder</button>
+            <p id="lockError" style="color:#e74c3c; font-size:13px; font-weight:bold; margin-top:10px; display:none;">Mot de passe incorrect ❌</p>
+        </div>
+    </div>
+
     <h1 id="titre">📅 Planning</h1>
 
     <div class="semaine-bar">
@@ -567,6 +578,32 @@
         const DB_URL = 'https://extendsclass.com/api/json-storage/bin/' + BIN_ID;
 
         let dbCache = null;
+
+        // --- PASSWORD SECURITY ---
+        function validerCode() {
+            const val = document.getElementById('lockPassword').value;
+            const err = document.getElementById('lockError');
+            if (val === 'sousou') {
+                localStorage.setItem('planning_authorized_v5', '1');
+                document.getElementById('lockScreen').style.display = 'none';
+            } else {
+                err.style.display = 'block';
+                document.getElementById('lockPassword').value = '';
+                document.getElementById('lockPassword').focus();
+            }
+        }
+
+        function verifierAuth() {
+            if (localStorage.getItem('planning_authorized_v5') === '1') {
+                document.getElementById('lockScreen').style.display = 'none';
+            } else {
+                document.getElementById('lockScreen').style.display = 'flex';
+                document.getElementById('lockPassword').focus();
+                document.getElementById('lockPassword').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') validerCode();
+                });
+            }
+        }
 
         async function fetchDB() {
             try {
@@ -726,9 +763,7 @@
             { label: '🍽️ Repas', bg: '#ffeaa7', fg: '#2d3436' },
         ];
 
-        // Palette active (modifiable par l'éditeur)
         let palette = JSON.parse(JSON.stringify(PALETTE_DEFAUT));
-        // Liste des labels "calme" — recalculée à chaque rendu
         let labelsCalmes = palette.filter(p => p.calme).map(p => p.label);
 
         async function chargerPalette() {
@@ -888,7 +923,6 @@
             el.innerHTML = `Calme : <b>${pct}%</b> (cible ~33%) — ${calmes}/${totalRemplies} cases`;
             el.classList.toggle('alerte', totalRemplies > 10 && pct < 25);
 
-            // Stats validation
             const pctFait = totalRemplies ? Math.round(faits / totalRemplies * 100) : 0;
             const ev = document.getElementById('stats-validation');
             ev.innerHTML = `Fait : <b>${faits}/${totalRemplies}</b> (${pctFait}%)`;
@@ -1281,6 +1315,7 @@
         }
 
         window.onload = async function() {
+            verifierAuth();
             await chargerPalette();
             if (palette === PALETTE_DEFAUT || !palette.length) {
                 const local = localStorage.getItem('palette_v1');
